@@ -31,7 +31,7 @@
           <div class="add">
             <form id="import_form" method="post">
               <span>添加设备：</span>
-              <el-input type="text" placeholder="请输入设备SN号" id='onesn' v-model="onesn" @keyup.enter.native="addOneSN"/></el-input>
+              <el-input type="text" placeholder="请输入设备SN号" id='onesn' v-model="onesn" @keyup.enter.native="addOneSN"></el-input>
               <el-button @click.native.prevent="addOneSN">添加SN</el-button>
               <div class="file-box">
                 <input type='button' class='btn' value='选择文件' />
@@ -43,17 +43,18 @@
           </div>
         </div>
         <div class="show">
-          <el-button @click="allState" :disabled="allNo" round>总共:{{no0}}</el-button>
-          <el-button @click="okState" :disabled="allNo" round>正常:{{no1}}</el-button>
-          <el-button @click="errState" :disabled="allNo" round>报警:{{no2}}</el-button>
-          <el-button @click="offState" :disabled="allNo" round>离线:{{no3}}</el-button>
+          <el-button @click="allState" :disabled="allNo" round :class="{choosecolor:ischoosecolor1}">总共:{{no0}}</el-button>
+          <el-button @click="okState" :disabled="allNo" round :class="{choosecolor:ischoosecolor2}">正常:{{no1}}</el-button>
+          <el-button @click="errState" :disabled="allNo" round :class="{choosecolor:ischoosecolor3}">报警:{{no2}}</el-button>
+          <el-button @click="offState" :disabled="allNo" round :class="{choosecolor:ischoosecolor4}">离线:{{no3}}</el-button>
           <div class="search">
             <input type="text" placeholder="请输入采集器SN号" v-model="conSN" id="conSN">
             <img src="../assets/images/search.png" @click="agingSearch">
           </div>
           <div>
             <span>开始时间:</span>
-            <span id="s_time"></span>
+            <span v-if="state==0">--</span>
+            <span id="s_time" v-if="state==1">{{starttime}}</span>
             <span id="e_time"></span>
           </div>
           <div>
@@ -78,7 +79,7 @@
                 <div class="top">
                   <span>{{record.sn}}</span>
                 </div>
-                <img src="../assets/images/close.png" class="daimg" @click="deleteSN(index)">
+                <img src="../assets/images/close.png" class="daimg" @click="deleteSN(record.sn)">
               </li>
               <li>
                 <div>逆变器：</div>
@@ -100,7 +101,7 @@
               </li>
               <li>
                 <div>出厂：</div>
-                <div>{{record.createDate | formatDate}}</div>
+                <div>{{record.createDate | formatDate2}}</div>
               </li>
               <li>
                 <div>信号：</div>
@@ -111,9 +112,9 @@
                 <div>{{record.infoCount}}</div>
               </li>
               <li>
-                <div>更新</div>
+                <!-- <div>更新</div> -->
                 <div v-if="record.timestamp==null">--</div>
-                <div v-else>{{parseFloat(record.timestamp) | formatDate}}</div>
+                <div v-else>{{parseFloat(record.timestamp) | formatDate}} (UTC)</div>
               </li>
             </ul>
           </div>
@@ -123,7 +124,7 @@
                 <div class="top">
                   <span>{{record.sn}}</span>
                 </div>
-                <img src="../assets/images/close.png" class="daimg" @click="deleteSN(index)">
+                <img src="../assets/images/close.png" class="daimg" @click="deleteSN(record.sn)">
               </li>
               <li>
                 <div>逆变器：</div>
@@ -144,9 +145,8 @@
                 <div>{{record.infoCount}}</div>
               </li>
               <li>
-                <div>更新</div>
                 <div v-if="record.timestamp==null">--</div>
-                <div v-else>{{parseFloat(record.timestamp) | formatDate}}</div>
+                <div v-else>{{parseFloat(record.timestamp) | formatDate}} (UTC)</div>
               </li>
             </ul>
           </div>
@@ -192,10 +192,10 @@
 </template>
 
 <script>
-import axios from 'axios'
+// import axios from 'axios'
 import $ from 'jquery'
-import promise from 'es6-promise';
-promise.polyfill();
+// import promise from 'es6-promise';
+// promise.polyfill();
 
 export default {
   name: 'NowAging',
@@ -254,7 +254,13 @@ export default {
       errshow:this.errshow,
       offshow:this.offshow,
       nowPage:this.nowPage,
-      timer:''
+      timer:'',
+      deleteID:'',
+      starttime:'',
+      ischoosecolor1:false,
+      ischoosecolor2:false,
+      ischoosecolor3:false,
+      ischoosecolor4:false,
     }
   },
   mounted(){
@@ -264,12 +270,12 @@ export default {
       this.$router.push('/login' )
     }
 
-    axios({
+    this.axios({
       method: 'post',
-      url: '/api/agingBatch/agingBatchList',
+      url: 'agingBatch/agingBatchList',
       headers: {"token":token}
     }).then(data=>{
-      console.log(data)
+      // console.log(data)
       this.alls=data.data.data
     })
     if(this.selected=="请选择批次号"){
@@ -284,6 +290,10 @@ export default {
       var date = new Date(time);
       return formatDate(date, 'yyyy-MM-dd hh:mm:ss');
     },
+    formatDate2(time) {
+      var date = new Date(time);
+      return formatDate2(date, 'yyyy-MM-dd');
+    },
   },
   watch: {
     selected: function (val) {
@@ -292,17 +302,19 @@ export default {
       this.pages=true
       this.allNo=false
       this.time=30
+      this.ischoosecolor1=true
       // this.canClick = true
       // this.noClick = false
       window.sessionStorage.setItem("agingBatchNo",b)
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
         method: 'post',
-        url: '/api/agingBatch/agingBatchList?agingBatchNo='+b,
+        url: 'agingBatch/agingBatchList?agingBatchNo='+b,
         headers: {"token":token}
       }).then(data=>{
         // console.log(data.data)
         this.state=data.data.data[0].state
+        this.starttime=data.data.data[0].agingStartDate
         // console.log(this.state)
         if(this.state==1){
           this.addAging=true
@@ -329,22 +341,22 @@ export default {
           this.btn3=false
         }
         // let data={'pageNo':1,'pageSize':14,'agingBatchNo':b,'state':this.state,'agingStartDate':agingStartDate}
-        axios({
+        this.axios({
           method: 'post',
-          url: "/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+this.state+"&agingStartDate="+agingStartDate,
+          url: "agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+this.state+"&agingStartDate="+agingStartDate,
           headers: {"token":token}
         }).then(data=>{
-          console.log(data)
+          // console.log(data)
           this.time=30
-          // console.log(data.data.data.records)
+          console.log(data.data.data.records)
           this.records=data.data.data.records
-          $("#s_time").html(getLocalTime(timestamp))
+          
         })
         return this.state
       })
-      axios({
+      this.axios({
         method: 'post',
-        url: "/api/agingBatch/deviceStateCount?agingBatchNo="+b,
+        url: "agingBatch/deviceStateCount?agingBatchNo="+b,
         headers: {"token":token}
       }).then(data=>{
         // console.log(data.data.data)
@@ -387,41 +399,68 @@ export default {
       let agingState=window.sessionStorage.getItem("agingState")
       let pageSize=this.changepage
       window.sessionStorage.setItem("pageSize",pageSize)
-      // let timer = window.setInterval(function(){
-      //   if ((me.time--) <= 0){
-      //     me.time = 30;
-      //     me.canClick = false
-      //     me.noClick = true
-      //     setTimeout(function(){
-      //       axios({
-      //         method: 'post',
-      //         url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
-      //         headers: {"token":token}
-      //       }).then(data=>{
-      //         me.canClick = true
-      //         me.noClick = false
-      //         console.log(data)
-      //         console.log(data.data.data.records)
-      //         this.records=data.data.data.records
-      //         $("#s_time").html(getLocalTime(timestamp))
-      //       })
-      //     },3000)
-      //   }
-      // }, 1000);
       let interval = window.setInterval(function(){
         if ((me.time--) <= 0){
           me.time = 30;
           me.canClick = true
-          axios({
-            method: 'post',
-            url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+pageSize+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
-            headers: {"token":token}
-          }).then(data=>{
-            console.log(data)
-            // console.log(data.body.data.records)
-            this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+          // me.axios({
+          //   method: 'post',
+          //   url:"agingBatch/deviceList?pageNo=1&pageSize="+pageSize+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+          //   headers: {"token":token}
+          // }).then(data=>{
+          //   // console.log(data)
+          //   // console.log(data.body.data.records)
+          //   me.records=data.data.data.records
+            
+            me.axios({
+              method: 'post',
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
+              headers: {"token":token}
+            }).then(data=>{
+            // this.state=data.data.data[0].state
+            let agingStartDate=data.data.data[0].agingStartDate
+            let agingState=data.data.data[0].state
+            me.axios({
+                method: 'post',
+                url:"agingBatch/deviceList?pageNo=1&pageSize="+me.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+                headers: {"token":token}
+              }).then(data=>{
+              // console.log(data.data.data.records)
+              me.records=data.data.data.records
+              me.axios({
+                method: 'post',
+                url: "agingBatch/deviceStateCount?agingBatchNo="+b,
+                headers: {"token":token}
+              }).then(data=>{
+                // console.log(data.data.data)
+                me.no0=data.data.data.normal+data.data.data.alert+data.data.data.offline
+                me.no1=data.data.data.normal
+                me.no2=data.data.data.alert
+                me.no3=data.data.data.offline
+                if(me.no0==0){
+                  me.allPage=Math.ceil(me.no0/14)+1
+                }else{
+                  me.allPage=Math.ceil(me.no0/14)
+                }
+                if(me.no1==0){
+                  me.okPage=Math.ceil(me.no1/14)+1
+                }else{
+                  me.okPage=Math.ceil(me.no1/14)
+                }
+                if(me.no2==0){
+                  me.errPage=Math.ceil(me.no2/14)+1
+                }else{
+                  me.errPage=Math.ceil(me.no2/14)
+                }
+                if(me.no3==0){
+                  me.offPage=Math.ceil(me.no3/14)+1
+                }else{
+                  me.offPage=Math.ceil(me.no3/14)
+                }
+              })
+            })
           })
+          // })
         }
       }, 1000);
     },
@@ -432,20 +471,20 @@ export default {
       let agingStartDate=window.sessionStorage.getItem("agingStartDate")
       let agingState=window.sessionStorage.getItem("agingState")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
         method: 'post',
-        url: "/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+        url: "agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
         headers: {"token":token}
       }).then(data=>{
         // console.log(data)
         // console.log(data.data.data.records)
         this.records=data.data.data.records
-        // $("#s_time").html(getLocalTime(timestamp))
+        // 
       })
 
-      axios({
+      this.axios({
           method: 'post',
-          url: "/api/agingBatch/deviceStateCount?agingBatchNo="+b,
+          url: "agingBatch/deviceStateCount?agingBatchNo="+b,
           headers: {"token":token}
         }).then(data=>{
         // console.log(data.data.data)
@@ -493,46 +532,82 @@ export default {
       this.list1=true
       this.list2=false
     },
-    send() {
-      // this.times=3
+    send(){
       this.refresh = false
       this.noClick = true
+      let token=window.sessionStorage.getItem("token")
+      let b=window.sessionStorage.getItem("agingBatchNo")
       let _this = this;
       setTimeout(function(){
         _this.refresh = true
         _this.noClick = false
-        let b=window.sessionStorage.getItem("agingBatchNo")
-        let agingStartDate=window.sessionStorage.getItem("agingStartDate")
-        let agingState=window.sessionStorage.getItem("agingState")
-        let token=window.sessionStorage.getItem("token")
-        let pageSize=window.sessionStorage.getItem("pageSize")
-        axios({
-          method: 'post',
-          url: "/api/agingBatch/deviceList?pageNo=1&pageSize="+pageSize+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
-          headers: {"token":token}
-        }).then(data=>{
-          // console.log(data)
-          // console.log(data.data.data.records)
-          this.records=data.data.data.records
-          // $("#s_time").html(getLocalTime(timestamp))
+        _this.axios({
+            method: 'post',
+            url:"agingBatch/agingBatchList?agingBatchNo="+b,
+            headers: {"token":token}
+          }).then(data=>{
+          // this.state=data.data.data[0].state
+          let agingStartDate=data.data.data[0].agingStartDate
+          let agingState=data.data.data[0].state
+          _this.axios({
+              method: 'post',
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+_this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              headers: {"token":token}
+            }).then(data=>{
+            // console.log(data.data.data.records)
+            _this.records=data.data.data.records
+            _this.time=30
+
+            _this.axios({
+              method: 'post',
+              url: "agingBatch/deviceStateCount?agingBatchNo="+b,
+              headers: {"token":token}
+            }).then(data=>{
+              // console.log(data.data.data)
+              _this.no0=data.data.data.normal+data.data.data.alert+data.data.data.offline
+              _this.no1=data.data.data.normal
+              _this.no2=data.data.data.alert
+              _this.no3=data.data.data.offline
+              if(_this.no0==0){
+                _this.allPage=Math.ceil(_this.no0/14)+1
+              }else{
+                _this.allPage=Math.ceil(_this.no0/14)
+              }
+              if(_this.no1==0){
+                _this.okPage=Math.ceil(_this.no1/14)+1
+              }else{
+                _this.okPage=Math.ceil(_this.no1/14)
+              }
+              if(_this.no2==0){
+                _this.errPage=Math.ceil(_this.no2/14)+1
+              }else{
+                _this.errPage=Math.ceil(_this.no2/14)
+              }
+              if(_this.no3==0){
+                _this.offPage=Math.ceil(_this.no3/14)+1
+              }else{
+                _this.offPage=Math.ceil(_this.no3/14)
+              }
+            })
+          })
         })
-      },3000);
+      },3000)
     },
     agingSearch(){
       let conSN=this.conSN
       let b=window.sessionStorage.getItem("agingBatchNo")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
           method: 'post',
-          url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+          url:"agingBatch/agingBatchList?agingBatchNo="+b,
           headers: {"token":token}
         }).then(data=>{
         this.state=data.data.data[0].state
         let agingStartDate=data.data.data[0].agingStartDate
         let agingState=data.data.data[0].state
-        axios({
+        this.axios({
           method: 'post',
-          url:"/api/agingBatch/deviceList?agingBatchNo="+b+"&collectorSn="+conSN,
+          url:"agingBatch/deviceList?agingBatchNo="+b+"&collectorSn="+conSN,
           headers: {"token":token}
         }).then(data=>{
           // console.log(data.data.data.records)
@@ -560,9 +635,9 @@ export default {
       let str=window.sessionStorage.getItem("importAll")
       let a=window.sessionStorage.getItem("agingBatchNo")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
           method: 'post',
-          url:"/api/agingBatch/addDevice?agingBatchNo="+a+"&deviceIds="+str,
+          url:"agingBatch/addDevice?agingBatchNo="+a+"&deviceIds="+str,
           headers: {"token":token}
         }).then(data=>{
         if(data.data.success==true){
@@ -583,9 +658,9 @@ export default {
         alert("请输入老化人员名称！")
       }else if (confirm("是否开始老化？")){
       let token=window.sessionStorage.getItem("token")
-        axios({
+        this.axios({
           method: 'post',
-          url:"/api/agingBatch/changeState?agingBatchNo="+a+"&state=1"+"&workerName"+name,
+          url:"agingBatch/changeState?agingBatchNo="+a+"&state=1"+"&workerName"+name,
           headers: {"token":token}
         }).then(data=>{
           this.state=1
@@ -606,9 +681,9 @@ export default {
         alert("请输入老化人员名称！")
       }else if (confirm("是否结束老化？")){
       let token=window.sessionStorage.getItem("token")
-        axios({
+        this.axios({
           method: 'post',
-          url:"/api/agingBatch/changeState?agingBatchNo="+a+"&state=2"+"&workerName"+name,
+          url:"agingBatch/changeState?agingBatchNo="+a+"&state=2"+"&workerName"+name,
           headers: {"token":token}
         }).then(data=>{
           this.state=2
@@ -629,9 +704,9 @@ export default {
         alert("请输入老化人员名称！")
       }else if (confirm("是否老化归档？")){
       let token=window.sessionStorage.getItem("token")
-        axios({
+        this.axios({
           method: 'post',
-          url:"/api/agingBatch/changeState?agingBatchNo="+a+"&state=3"+"&workerName"+name,
+          url:"agingBatch/changeState?agingBatchNo="+a+"&state=3"+"&workerName"+name,
           headers: {"token":token}
         }).then(data=>{
           this.state=3
@@ -644,40 +719,66 @@ export default {
       }
     },
     deleteSN(index){
+      console.log(index)
       let b=window.sessionStorage.getItem("agingBatchNo")
-      if (confirm("是否删除？")){
       let token=window.sessionStorage.getItem("token")
-        axios({
+      let agingStartDate=window.sessionStorage.getItem("agingStartDate")
+      let agingState=window.sessionStorage.getItem("agingState")
+      if (confirm("是否删除？")){
+        this.axios({
           method: 'post',
-          url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b,
+          url:"agingBatch/delDevice?agingBatchNo="+b+"&deviceIds="+index,
           headers: {"token":token}
         }).then(data=>{
-          let deleteSN=data.data.data.records[index].sn
-          console.log(deleteSN)
-          axios({
+          console.log(data)
+          this.axios({
             method: 'post',
-            url:"/api/agingBatch/delDevice?agingBatchNo="+b+"&deviceIds="+deleteSN,
+            url:"agingBatch/agingBatchList?agingBatchNo="+b,
             headers: {"token":token}
           }).then(data=>{
-            axios({
-              method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
-              headers: {"token":token}
-            }).then(data=>{
-        this.state=data.data.data[0].state
-        let agingStartDate=data.data.data[0].agingStartDate
-        let agingState=data.data.data[0].state
-        axios({
-              method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
-              headers: {"token":token}
-            }).then(data=>{
-          // console.log(data.data.data.records)
-          this.records=data.data.data.records
-          $("#s_time").html(getLocalTime(timestamp))
-        })
-      })
-            
+            this.state=data.data.data[0].state
+            let agingStartDate=data.data.data[0].agingStartDate
+            let agingState=data.data.data[0].state
+            this.axios({
+                  method: 'post',
+                  url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+                  headers: {"token":token}
+                }).then(data=>{
+              // console.log(data.data.data.records)
+              this.axios({
+                method: 'post',
+                url: "agingBatch/deviceStateCount?agingBatchNo="+b,
+                headers: {"token":token}
+              }).then(data=>{
+                // console.log(data.data.data)
+                this.no0=data.data.data.normal+data.data.data.alert+data.data.data.offline
+                this.no1=data.data.data.normal
+                this.no2=data.data.data.alert
+                this.no3=data.data.data.offline
+                if(this.no0==0){
+                  this.allPage=Math.ceil(this.no0/14)+1
+                }else{
+                  this.allPage=Math.ceil(this.no0/14)
+                }
+                if(this.no1==0){
+                  this.okPage=Math.ceil(this.no1/14)+1
+                }else{
+                  this.okPage=Math.ceil(this.no1/14)
+                }
+                if(this.no2==0){
+                  this.errPage=Math.ceil(this.no2/14)+1
+                }else{
+                  this.errPage=Math.ceil(this.no2/14)
+                }
+                if(this.no3==0){
+                  this.offPage=Math.ceil(this.no3/14)+1
+                }else{
+                  this.offPage=Math.ceil(this.no3/14)
+                }
+              })
+              this.records=data.data.data.records
+              
+            })
           })
         })
       }
@@ -694,18 +795,18 @@ export default {
         alert("请输入要添加的老化批次！");
       }else if (confirm("是否添加老化批次？")){
       let token=window.sessionStorage.getItem("token")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/checkOnly?agingBatchNo="+add_aging,
+              url:"agingBatch/checkOnly?agingBatchNo="+add_aging,
               headers: {"token":token}
             }).then(data=>{
           // console.log(data.data.success)
           if(data.data.success==false){
             alert("批次号已存在，请重新输入！")
           }else if(data.data.success==true){
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/addAging?agingBatchNo="+add_aging+"&workerName="+name,
+              url:"agingBatch/addAging?agingBatchNo="+add_aging+"&workerName="+name,
               headers: {"token":token}
             }).then(data=>{
               if(data.data.success==true){
@@ -723,51 +824,116 @@ export default {
       }
     },
     addOneSN(){
-      console.log(11111)
       let a=$("#selected").val()
-      let onesn=this.onesn
+      // let onesn=this.onesn
+      let str=this.onesn
+      let pos=str.indexOf(",")
+      if(pos==-1){
+        let mm=str.slice(0)
+        this.onesn=mm
+      }else if(pos!=-1){
+        let mm=str.slice(0,pos)
+        this.onesn=mm
+      }
+      // console.log(mm)
       if(a == "" || a==null || a=="请选择批次号"){
         alert("请先选择正在读取中的老化批次！");
-      }else if(onesn==''||onesn==null){
+      }else if(this.onesn==''||this.onesn==null){
         alert("请输入要添加的SN号！")
-      }else if (confirm("是否添加设备SN号？")){
-      let token=window.sessionStorage.getItem("token")
-        axios({
+      }else{
+        let token=window.sessionStorage.getItem("token")
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/addDevice?agingBatchNo="+a+"&deviceIds="+onesn,
+              url:"agingBatch/addDevice?agingBatchNo="+a+"&deviceIds="+this.onesn,
               headers: {"token":token}
             }).then(data=>{
           if(data.data.success==true){
-            alert("添加成功！")
-            location.reload()
+            // alert("添加成功！")
+            // location.reload()
+            let b=window.sessionStorage.getItem("agingBatchNo")
+            let token=window.sessionStorage.getItem("token")
+            this.axios({
+                    method: 'post',
+                    url:"agingBatch/agingBatchList?agingBatchNo="+b,
+                    headers: {"token":token}
+                  }).then(data=>{
+
+              // this.state=data.data.data[0].state
+              let agingStartDate=data.data.data[0].agingStartDate
+              let agingState=data.data.data[0].state
+              this.axios({
+                    method: 'post',
+                    url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+                    headers: {"token":token}
+                  }).then(data=>{
+                // console.log(data.data.data.records)
+                this.records=data.data.data.records
+              })
+            })
           }else{
             alert("添加失败！")
-            location.reload()
           }
         })
         this.onesn=""
       }
+      let token=window.sessionStorage.getItem("token")
+      let b=window.sessionStorage.getItem("agingBatchNo")
+      this.axios({
+        method: 'post',
+        url: "agingBatch/deviceStateCount?agingBatchNo="+b,
+        headers: {"token":token}
+      }).then(data=>{
+        // console.log(data.data.data)
+        this.no0=data.data.data.normal+data.data.data.alert+data.data.data.offline
+        this.no1=data.data.data.normal
+        this.no2=data.data.data.alert
+        this.no3=data.data.data.offline
+        if(this.no0==0){
+          this.allPage=Math.ceil(this.no0/14)+1
+        }else{
+          this.allPage=Math.ceil(this.no0/14)
+        }
+        if(this.no1==0){
+          this.okPage=Math.ceil(this.no1/14)+1
+        }else{
+          this.okPage=Math.ceil(this.no1/14)
+        }
+        if(this.no2==0){
+          this.errPage=Math.ceil(this.no2/14)+1
+        }else{
+          this.errPage=Math.ceil(this.no2/14)
+        }
+        if(this.no3==0){
+          this.offPage=Math.ceil(this.no3/14)+1
+        }else{
+          this.offPage=Math.ceil(this.no3/14)
+        }
+      })
     },
     allState(){
+      this.ischoosecolor1=true
+      this.ischoosecolor2=false
+      this.ischoosecolor3=false
+      this.ischoosecolor4=false
       let b=window.sessionStorage.getItem("agingBatchNo")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
 
         // this.state=data.data.data[0].state
         let agingStartDate=data.data.data[0].agingStartDate
         let agingState=data.data.data[0].state
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
           // console.log(data.data.data.records)
           this.records=data.data.data.records
-          $("#s_time").html(getLocalTime(timestamp))
+          
         })
       })
       this.allshow=1
@@ -777,24 +943,28 @@ export default {
       this.nowPage=1
     },
     okState(){
+      this.ischoosecolor1=false
+      this.ischoosecolor2=true
+      this.ischoosecolor3=false
+      this.ischoosecolor4=false
       let b=window.sessionStorage.getItem("agingBatchNo")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
         // this.state=data.data.data[0].state
         let agingStartDate=data.data.data[0].agingStartDate
         let agingState=data.data.data[0].state
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=1"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=1"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
           // console.log(data.data.data.records)
           this.records=data.data.data.records
-          $("#s_time").html(getLocalTime(timestamp))
+          
         })
       })
       this.allshow=0
@@ -804,24 +974,28 @@ export default {
       this.nowPage=1
     },
     errState(){
+      this.ischoosecolor1=false
+      this.ischoosecolor2=false
+      this.ischoosecolor3=true
+      this.ischoosecolor4=false
       let b=window.sessionStorage.getItem("agingBatchNo")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
         // this.state=data.data.data[0].state
         let agingStartDate=data.data.data[0].agingStartDate
         let agingState=data.data.data[0].state
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=3"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=3"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
           // console.log(data.data.data.records)
           this.records=data.data.data.records
-          $("#s_time").html(getLocalTime(timestamp))
+          
         })
       })
       this.allshow=0
@@ -831,24 +1005,28 @@ export default {
       this.nowPage=1
     },
     offState(){
+      this.ischoosecolor1=false
+      this.ischoosecolor2=false
+      this.ischoosecolor3=false
+      this.ischoosecolor4=true
       let b=window.sessionStorage.getItem("agingBatchNo")
       let token=window.sessionStorage.getItem("token")
-      axios({
+      this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
         // this.state=data.data.data[0].state
         let agingStartDate=data.data.data[0].agingStartDate
         let agingState=data.data.data[0].state
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=2"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=2"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
           // console.log(data.data.data.records)
           this.records=data.data.data.records
-          $("#s_time").html(getLocalTime(timestamp))
+          
         })
       })
       this.allshow=0
@@ -861,85 +1039,85 @@ export default {
       let token=window.sessionStorage.getItem("token")
       if(this.allshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=1
       }else if(this.okshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=1"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=1"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=1
       }else if(this.errshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=3"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=3"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=1
       }else if(this.offshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=2"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo=1&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=2"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=1
@@ -953,22 +1131,22 @@ export default {
         }else if(this.nowPage<=this.allPage){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage-1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -979,22 +1157,22 @@ export default {
         }else if(this.nowPage<=this.okPage){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage-1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1005,22 +1183,22 @@ export default {
         }else if(this.nowPage<=this.errPage){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage-1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1031,22 +1209,22 @@ export default {
         }else if(this.nowPage<=this.offPage){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage-1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1061,22 +1239,22 @@ export default {
         }else if(this.nowPage>=1){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage+1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1087,22 +1265,22 @@ export default {
         }else if(this.nowPage>=1){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage+1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1113,22 +1291,22 @@ export default {
         }else if(this.nowPage>=1){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage+1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1139,22 +1317,22 @@ export default {
         }else if(this.nowPage>=1){
           let b=window.sessionStorage.getItem("agingBatchNo")
           let previousPage=this.nowPage+1
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
             // this.state=data.data.data[0].state
             let agingStartDate=data.data.data[0].agingStartDate
             let agingState=data.data.data[0].state
-            axios({
+            this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+previousPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
               // console.log(data.data.data.records)
               this.records=data.data.data.records
-              $("#s_time").html(getLocalTime(timestamp))
+              
             })
           })
           this.nowPage=previousPage
@@ -1165,85 +1343,85 @@ export default {
       let token=window.sessionStorage.getItem("token")
       if(this.allshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+this.allPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+this.allPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=this.allPage
       }else if(this.okshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+this.okPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=1"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+this.okPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=1"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=this.okPage
       }else if(this.errshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+this.errPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=3"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+this.errPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=3"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=this.errPage
       }else if(this.offshow==1){
         let b=window.sessionStorage.getItem("agingBatchNo")
-        axios({
+        this.axios({
               method: 'post',
-              url:"/api/agingBatch/agingBatchList?agingBatchNo="+b,
+              url:"agingBatch/agingBatchList?agingBatchNo="+b,
               headers: {"token":token}
             }).then(data=>{
           // this.state=data.data.data[0].state
           let agingStartDate=data.data.data[0].agingStartDate
           let agingState=data.data.data[0].state
-          axios({
+          this.axios({
               method: 'post',
-              url:"/api/agingBatch/deviceList?pageNo="+this.offPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=2"+"&agingStartDate="+agingStartDate,
+              url:"agingBatch/deviceList?pageNo="+this.offPage+"&pageSize="+this.changepage+"&agingBatchNo="+b+"&state="+agingState+"&collectorState=2"+"&agingStartDate="+agingStartDate,
               headers: {"token":token}
             }).then(data=>{
             // console.log(data.data.data.records)
             this.records=data.data.data.records
-            $("#s_time").html(getLocalTime(timestamp))
+            
           })
         })
         this.nowPage=this.offPage
@@ -1273,15 +1451,36 @@ function formatDate (date, fmt) {
   }
   return fmt;
 }
-
+function formatDate2 (date, fmt) {
+  if (/(y+)/.test(fmt)) {
+    fmt = fmt.replace(RegExp.$1, (date.getFullYear() + '').substr(4 - RegExp.$1.length));
+  }
+  let o = {
+    'M+': date.getMonth() + 1,
+    'd+': date.getDate(),
+    'h+': date.getHours(),
+    'm+': date.getMinutes(),
+    's+': date.getSeconds()
+  };
+  for (let k in o) {
+    if (new RegExp(`(${k})`).test(fmt)) {
+      let str = o[k] + '';
+      fmt = fmt.replace(RegExp.$1, (RegExp.$1.length === 1) ? str : padLeftZero(str));
+    }
+  }
+  return fmt;
+}
 function padLeftZero (str) {
   return ('00' + str).substr(str.length);
 }
 
-// var timestamp = Date.parse(new Date())/1000
-// function getLocalTime(nS) {     
-//   return new Date(parseInt(nS) * 1000).toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ")    
-// }
+
+
+
+var timestamp = Date.parse(new Date())/1000
+function getLocalTime(nS) {     
+  return new Date(parseInt(nS) * 1000).toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ")    
+}
 
 </script>
 
@@ -1733,7 +1932,7 @@ input:-ms-input-placeholder{  /* Internet Explorer 10-11 */
   height: 30px;
   line-height: 30px;
   font-size: 14px;
-  padding-left: 10px;
+  padding:0 10px;
   color: #9B9B9B;
 }
 .content ul li div:first-child{
@@ -1757,6 +1956,9 @@ input:-ms-input-placeholder{  /* Internet Explorer 10-11 */
   right: 5px;
   cursor: pointer;
 }
+.content ul li:last-child div{
+  width: 100%;
+}
 #equip_list_div{
   margin-bottom: 20px;
   width: 100%;
@@ -1771,5 +1973,10 @@ input:-ms-input-placeholder{  /* Internet Explorer 10-11 */
 }
 .pages{
   margin: 0 10px;
+}
+.choosecolor{
+  color: #409EFF;
+  border-color: #c6e2ff;
+  background-color: #ecf5ff;
 }
 </style>

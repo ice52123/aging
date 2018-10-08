@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import axios from 'axios'
+// import axios from 'axios'
 import md5 from 'js-md5'
 
 export default {
@@ -29,21 +29,21 @@ export default {
     }
   },
   created(){
-    // let b_name = navigator.appName;
-    // let b_version = navigator.appVersion;
-    // let version = b_version.split(";");
-    // let trim_version = version[1].replace(/[ ]/g, "");
-    // let s=trim_version.replace("MSIE", "")
+    let b_name = navigator.appName;
+    let b_version = navigator.appVersion;
+    let version = b_version.split(";");
+    let trim_version = version[1].replace(/[ ]/g, "");
+    let s=trim_version.replace("MSIE", "")
     // console.log(parseInt(s))
-    // let VS=parseInt(s)
-    // if (b_name == "Microsoft Internet Explorer") {
-    //     /*如果是IE9及其以下*/
-    //     if (VS <=9) {
-    //         alert("IE浏览器版本过低，请更新IE浏览器或使用其他浏览器");
-    //         //然后跳到需要连接的下载网站 
-    //         window.location.href="https://support.dmeng.net/upgrade-your-browser.html"; 
-    //     }
-    // }
+    let VS=parseInt(s)
+    if (b_name == "Microsoft Internet Explorer") {
+        /*如果是IE9及其以下*/
+        if (VS <=9) {
+            alert("浏览器版本过低，请更新浏览器或使用其他浏览器");
+            //然后跳到需要连接的下载网站 
+            window.location.href="https://support.dmeng.net/upgrade-your-browser.html"; 
+        }
+    }
   },
   methods:{
     login(){
@@ -56,9 +56,8 @@ export default {
       let password=md5(this.ruleForm.password)
       console.log(md5(this.ruleForm.password))
       let data={"userInfo":this.ruleForm.name,"passWord":password}
-      // let data={"userInfo":this.ruleForm.name,"passWord":this.ruleForm.password}
-      axios.post("/api/user/login1",data).then(data=>{
-        // console.log(data)
+      this.axios.post("user/login1",data).then(data=>{
+        console.log(data)
         // console.log(data.data.csrfToken)
         if(data.data.success==false){
           this.$message.error(data.data.msg)
@@ -67,6 +66,8 @@ export default {
           this.$router.push('/nowaging')
         }
       })
+
+
     }
   }
 }

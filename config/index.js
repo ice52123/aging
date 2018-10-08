@@ -10,16 +10,29 @@ module.exports = {
     // Paths
     assetsSubDirectory: 'static',
     assetsPublicPath: '/',
-    proxyTable: {
-        '/api/**':{
-            target:'http://192.168.3.111:8899/',
-            secure:false,
-            changeOrigin:true,
-            pathRewrite:{
-                '^/api':''
-            }
-        }
-    },
+    // proxyTable: {
+    //     '/api':{
+    //         target:'http://139.224.5.126:1111/',
+    //         // secure:false,
+    //         changeOrigin:true,
+    //         // pathRewrite:{
+    //         //     '^/api':''
+    //         // }
+    //     }
+    // },
+    
+    // proxyTable: {
+    //   firstProxy: {
+    //     target: 'http://192.168.3.111:8899/',
+    //     filter(pathname, req) {
+    //       //console.info('firstProxy',req)
+    //       const isApi = pathname.indexOf('/api') == 0;
+    //       const ret = isApi;
+    //       return ret;
+    //     },
+    //     changeOrigin: true,
+    //   },
+    // }
 
     // Various Dev Server settings
     host: 'localhost', // can be overwritten by process.env.HOST
